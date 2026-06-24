@@ -157,7 +157,11 @@ page = st.sidebar.radio("Navigation", ["Setup", "Teachers", "Curriculum", "Gener
 if page == "Setup":
     st.subheader("Master Subjects & Classes")
     if st.button("Add Subject"): execute_db("INSERT INTO subjects (name) VALUES (?)", ("Physics",))
-    if st.form_submit_button("Generate Bulk Classes"): pass # Add logic here as per requirements
+    
+    with st.form("bulk_class_form"):
+        st.write("Generate Bulk Classes")
+        if st.form_submit_button("Generate"): 
+            pass # Add logic here as per requirements
 
 elif page == "Teachers":
     st.subheader("Manage Teachers")
