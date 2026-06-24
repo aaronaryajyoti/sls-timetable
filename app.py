@@ -3,6 +3,7 @@ import pandas as pd
 import sqlite3
 from ortools.sat.python import cp_model
 import os
+from timetable_solver import solve_timetable
 
 # --- UI CONFIGURATION ---
 st.set_page_config(page_title="SLS Timetable Generator", page_icon="🏫", layout="wide")
