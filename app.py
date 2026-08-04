@@ -258,36 +258,40 @@ elif page == "2. Master Curriculum":
     if not grades:
         st.warning("Please setup classes first.")
     else:
-        st.info("Assign subjects to a Class. The Optional Group rules update based on the Class you select.")
-        sel_grade = st.selectbox("🎯 Step 1: Select Target Class", grades)
+        st.info("🔒 The curriculum mapping is strictly controlled and loaded from the master Excel sheet.")
         
-        if str(sel_grade) in ['9', '10']:
-            opt_choices = ["NONE", "Group 1 (Language: Hindi/Odia)", "Group 2 (Electives: IT/PE/Arts)"]
-        elif str(sel_grade) == '8':
-            opt_choices = ["NONE", "Group 1 (Language: Hindi/Odia)"]
-        else:
-            opt_choices = ["NONE"]
-        
-        st.markdown(f"**Step 2: Add Subjects to Class {sel_grade}**")
-        with st.form("add_curriculum_form"):
-            c1, c2, c3 = st.columns(3)
-            sel_subj = c1.selectbox("Select Subject", MASTER_SUBJECTS)
-            periods = c2.number_input("Periods/Week", 1, 10, 4)
-            opt_group = c3.selectbox("Optional Group Mapping", opt_choices)
-            
-            if st.form_submit_button("Add to Master Syllabus"):
-                execute_db("INSERT INTO curriculum (grade, subject, periods, optional_group) VALUES (?, ?, ?, ?)", (sel_grade, sel_subj, periods, opt_group))
-                st.success(f"Added {sel_subj} to Class {sel_grade}")
+        if st.button("🚀 Load Curriculum from Excel", type="primary"):
+            try:
+                # Read the specified excel sheet
+                df_excel = pd.read_excel("Subject_List_Class_1_to_10_2.xlsx")
+                
+                # Clear the existing curriculum table to prevent duplicates
+                execute_db("DELETE FROM curriculum")
+                
+                # Iterate and insert the hardcoded mappings
+                for _, row in df_excel.iterrows():
+                    # Fallbacks applied to support common column name variations
+                    grade = str(row.get('Grade', row.get('Class', ''))).strip()
+                    subj = str(row.get('Subject', '')).strip()
+                    periods = int(row.get('Periods', 4)) # Default to 4 if missing
+                    opt_grp = str(row.get('Optional Group', 'NONE')).strip()
+                    
+                    # Basic validation to ensure empty rows aren't added
+                    if grade and subj and grade != 'nan' and subj != 'nan':
+                        execute_db("INSERT INTO curriculum (grade, subject, periods, optional_group) VALUES (?, ?, ?, ?)", 
+                                   (grade, subj, periods, opt_grp))
+                
+                st.success("✅ Master Curriculum successfully loaded from 'Subject_List_Class_1_to_10_2.xlsx'!")
                 st.rerun()
+                
+            except Exception as e:
+                st.error(f"❌ Could not load from Excel. Error: {e}")
+                st.info("ℹ️ Please ensure 'Subject_List_Class_1_to_10_2.xlsx' is present in the directory and contains columns: 'Grade' (or 'Class'), 'Subject', 'Periods', and 'Optional Group'.")
                 
         st.subheader("Current Syllabus")
         df_curr = run_query("SELECT * FROM curriculum ORDER BY CAST(grade AS INTEGER)")
         if not df_curr.empty:
             st.dataframe(df_curr, hide_index=True, use_container_width=True)
-            del_curr = st.number_input("Delete Row ID:", min_value=0)
-            if st.button("Delete Requirement"):
-                execute_db("DELETE FROM curriculum WHERE id=?", (del_curr,))
-                st.rerun()
 
 elif page == "3. Teacher Roster":
     st.title("👨‍🏫 Teacher Roster")
