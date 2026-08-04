@@ -100,7 +100,35 @@ def execute_db(query, params=()):
     conn.commit()
     conn.close()
 
-# --- 4. THE AI SOLVER ENGINE ---
+# --- 4. ADMINISTRATOR AUTHENTICATION GATEWAY ---
+if 'authenticated' not in st.session_state:
+    st.session_state['authenticated'] = False
+
+if not st.session_state['authenticated']:
+    try:
+        st.image("slsangul_logo.jpg", width=120)
+    except:
+        pass
+    
+    st.title("🔐 SLS Administrator Authentication")
+    st.info("Restricted Portal: Please log in with the administrator password to manage school configurations and generate timetables.")
+    
+    with st.form("auth_form"):
+        admin_pass = st.text_input("Administrator Password", type="password")
+        submit_btn = st.form_submit_button("Access Portal", type="primary")
+        
+        if submit_btn:
+            # Change "slsangul2026" to any secure password you prefer
+            if admin_pass == "slsangul2026":
+                st.session_state['authenticated'] = True
+                st.success("✅ Authentication successful! Unlocking portal...")
+                st.rerun()
+            else:
+                st.error("❌ Incorrect administrator password. Access denied.")
+    
+    st.stop() # Halts script execution until login passes
+
+# --- 5. THE AI SOLVER ENGINE ---
 def solve_timetable(df_teachers, df_classes, df_curriculum, num_days=5, num_periods=8):
     model = cp_model.CpModel()
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
@@ -201,11 +229,16 @@ def solve_timetable(df_teachers, df_classes, df_curriculum, num_days=5, num_peri
         return True, class_results, teacher_results
     return False, None, None
 
-# --- 5. STREAMLIT UI ---
+# --- 6. STREAMLIT UI ---
 try:
     st.sidebar.image("slsangul_logo.jpg", use_column_width=True)
 except:
     st.sidebar.markdown("### 🏫 Saint Lawrence School")
+
+st.sidebar.success("🔓 Authenticated as Administrator")
+if st.sidebar.button("🔒 Logout"):
+    st.session_state['authenticated'] = False
+    st.rerun()
 
 page = st.sidebar.radio("Navigation", ["1. Manage Classes", "2. Master Curriculum", "3. Teacher Roster", "4. Generate Timetable"])
 
@@ -253,45 +286,32 @@ if page == "1. Manage Classes":
 
 elif page == "2. Master Curriculum":
     st.title("📚 Define Master Curriculum")
-    grades = run_query("SELECT DISTINCT grade FROM classes ORDER BY CAST(grade AS INTEGER)")['grade'].tolist()
     
-    if not grades:
-        st.warning("Please setup classes first.")
-    else:
-        st.info("🔒 The curriculum mapping is strictly controlled and loaded from the master Excel sheet.")
-        
-        if st.button("🚀 Load Curriculum from Excel", type="primary"):
+    st.info("🔒 The curriculum mapping is loaded directly from your master Excel sheet.")
+    uploaded_file = st.file_uploader("📂 Upload Curriculum Excel File (.xlsx)", type=["xlsx", "xls"])
+    
+    if uploaded_file is not None:
+        if st.button("🚀 Load Curriculum from Uploaded File", type="primary"):
             try:
-                # UPDATED: Reading the correct filename
-                df_excel = pd.read_excel("Subject_List_Class_1_to_10.xlsx")
-                
-                # Clear the existing curriculum table to prevent duplicates
+                df_excel = pd.read_excel(uploaded_file)
                 execute_db("DELETE FROM curriculum")
-                
-                # Iterate and insert the hardcoded mappings
                 for _, row in df_excel.iterrows():
-                    # Fallbacks applied to support common column name variations
                     grade = str(row.get('Grade', row.get('Class', ''))).strip()
                     subj = str(row.get('Subject', '')).strip()
-                    periods = int(row.get('Periods', 4)) # Default to 4 if missing
+                    periods = int(row.get('Periods', 4))
                     opt_grp = str(row.get('Optional Group', 'NONE')).strip()
-                    
-                    # Basic validation to ensure empty rows aren't added
                     if grade and subj and grade != 'nan' and subj != 'nan':
                         execute_db("INSERT INTO curriculum (grade, subject, periods, optional_group) VALUES (?, ?, ?, ?)", 
                                    (grade, subj, periods, opt_grp))
-                
-                st.success("✅ Master Curriculum successfully loaded from 'Subject_List_Class_1_to_10.xlsx'!")
+                st.success("✅ Master Curriculum successfully loaded from Excel!")
                 st.rerun()
-                
             except Exception as e:
                 st.error(f"❌ Could not load from Excel. Error: {e}")
-                st.info("ℹ️ Please ensure 'Subject_List_Class_1_to_10.xlsx' is present in the directory and contains columns: 'Grade' (or 'Class'), 'Subject', 'Periods', and 'Optional Group'.")
                 
-        st.subheader("Current Syllabus")
-        df_curr = run_query("SELECT * FROM curriculum ORDER BY CAST(grade AS INTEGER)")
-        if not df_curr.empty:
-            st.dataframe(df_curr, hide_index=True, use_container_width=True)
+    st.subheader("Current Syllabus")
+    df_curr = run_query("SELECT * FROM curriculum ORDER BY CAST(grade AS INTEGER)")
+    if not df_curr.empty:
+        st.dataframe(df_curr, hide_index=True, use_container_width=True)
 
 elif page == "3. Teacher Roster":
     st.title("👨‍🏫 Teacher Roster")
@@ -334,7 +354,6 @@ elif page == "4. Generate Timetable":
     df_curr = run_query("SELECT * FROM curriculum")
     
     if st.button("🚀 Generate Optimized Timetable", type="primary", use_container_width=True):
-        # 1. SAFETY CHECK: Ensure database is not empty before running
         if df_t.empty or df_c.empty or df_curr.empty:
             st.warning("⚠️ Database is incomplete! Please ensure you have added Classes, Curriculum, and Teachers before generating.")
         else:
@@ -347,7 +366,6 @@ elif page == "4. Generate Timetable":
                 tab_classes, tab_teachers = st.tabs(["📚 Class Timetables", "👨‍🏫 Teacher Timetables"])
                 
                 with tab_classes:
-                    # 2. SAFETY CHECK: Only draw tabs if class_schedules is not empty
                     if class_schedules:
                         class_tabs = st.tabs(list(class_schedules.keys()))
                         for idx, t in enumerate(class_tabs):
@@ -357,7 +375,6 @@ elif page == "4. Generate Timetable":
                         st.info("No class schedules generated.")
                             
                 with tab_teachers:
-                    # 3. SAFETY CHECK: Only draw tabs if teacher_schedules is not empty
                     if teacher_schedules:
                         teacher_tabs = st.tabs(list(teacher_schedules.keys()))
                         for idx, t in enumerate(teacher_tabs):
