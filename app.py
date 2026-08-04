@@ -262,8 +262,8 @@ elif page == "2. Master Curriculum":
         
         if st.button("🚀 Load Curriculum from Excel", type="primary"):
             try:
-                # Read the specified excel sheet
-                df_excel = pd.read_excel("Subject_List_Class_1_to_10_2.xlsx")
+                # UPDATED: Reading the correct filename
+                df_excel = pd.read_excel("Subject_List_Class_1_to_10.xlsx")
                 
                 # Clear the existing curriculum table to prevent duplicates
                 execute_db("DELETE FROM curriculum")
@@ -281,12 +281,12 @@ elif page == "2. Master Curriculum":
                         execute_db("INSERT INTO curriculum (grade, subject, periods, optional_group) VALUES (?, ?, ?, ?)", 
                                    (grade, subj, periods, opt_grp))
                 
-                st.success("✅ Master Curriculum successfully loaded from 'Subject_List_Class_1_to_10_2.xlsx'!")
+                st.success("✅ Master Curriculum successfully loaded from 'Subject_List_Class_1_to_10.xlsx'!")
                 st.rerun()
                 
             except Exception as e:
                 st.error(f"❌ Could not load from Excel. Error: {e}")
-                st.info("ℹ️ Please ensure 'Subject_List_Class_1_to_10_2.xlsx' is present in the directory and contains columns: 'Grade' (or 'Class'), 'Subject', 'Periods', and 'Optional Group'.")
+                st.info("ℹ️ Please ensure 'Subject_List_Class_1_to_10.xlsx' is present in the directory and contains columns: 'Grade' (or 'Class'), 'Subject', 'Periods', and 'Optional Group'.")
                 
         st.subheader("Current Syllabus")
         df_curr = run_query("SELECT * FROM curriculum ORDER BY CAST(grade AS INTEGER)")
