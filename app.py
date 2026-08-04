@@ -330,24 +330,36 @@ elif page == "4. Generate Timetable":
     df_curr = run_query("SELECT * FROM curriculum")
     
     if st.button("🚀 Generate Optimized Timetable", type="primary", use_container_width=True):
-        with st.spinner("Calculating optimal schedules..."):
-            success, class_schedules, teacher_schedules = solve_timetable(df_t, df_c, df_curr)
-            
-        if success:
-            st.success("✅ Timetable Generated Successfully!")
-            
-            tab_classes, tab_teachers = st.tabs(["📚 Class Timetables", "👨‍🏫 Teacher Timetables"])
-            
-            with tab_classes:
-                class_tabs = st.tabs(list(class_schedules.keys()))
-                for idx, t in enumerate(class_tabs):
-                    with t:
-                        st.dataframe(class_schedules[list(class_schedules.keys())[idx]], hide_index=True)
-                        
-            with tab_teachers:
-                teacher_tabs = st.tabs(list(teacher_schedules.keys()))
-                for idx, t in enumerate(teacher_tabs):
-                    with t:
-                        st.dataframe(teacher_schedules[list(teacher_schedules.keys())[idx]], hide_index=True)
+        # 1. SAFETY CHECK: Ensure database is not empty before running
+        if df_t.empty or df_c.empty or df_curr.empty:
+            st.warning("⚠️ Database is incomplete! Please ensure you have added Classes, Curriculum, and Teachers before generating.")
         else:
-            st.error("❌ Failed. You need more teachers or fewer required periods.")
+            with st.spinner("Calculating optimal schedules..."):
+                success, class_schedules, teacher_schedules = solve_timetable(df_t, df_c, df_curr)
+                
+            if success:
+                st.success("✅ Timetable Generated Successfully!")
+                
+                tab_classes, tab_teachers = st.tabs(["📚 Class Timetables", "👨‍🏫 Teacher Timetables"])
+                
+                with tab_classes:
+                    # 2. SAFETY CHECK: Only draw tabs if class_schedules is not empty
+                    if class_schedules:
+                        class_tabs = st.tabs(list(class_schedules.keys()))
+                        for idx, t in enumerate(class_tabs):
+                            with t:
+                                st.dataframe(class_schedules[list(class_schedules.keys())[idx]], hide_index=True)
+                    else:
+                        st.info("No class schedules generated.")
+                            
+                with tab_teachers:
+                    # 3. SAFETY CHECK: Only draw tabs if teacher_schedules is not empty
+                    if teacher_schedules:
+                        teacher_tabs = st.tabs(list(teacher_schedules.keys()))
+                        for idx, t in enumerate(teacher_tabs):
+                            with t:
+                                st.dataframe(teacher_schedules[list(teacher_schedules.keys())[idx]], hide_index=True)
+                    else:
+                        st.info("No teacher schedules generated.")
+            else:
+                st.error("❌ Failed. You need more teachers or fewer required periods.")
