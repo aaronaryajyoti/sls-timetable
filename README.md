@@ -1,4 +1,4 @@
-#🏫 Saint Lawrence School - Automated Timetable & Faculty Management System
+🏫 Saint Lawrence School - Automated Timetable & Faculty Management System
 
 An advanced, AI-powered timetable generation and school administration web application built specifically for Saint Lawrence School (Angul) using Streamlit, SQLite, and Google's OR-Tools Constraint Programming Engine.
 
