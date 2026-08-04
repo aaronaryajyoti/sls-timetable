@@ -118,7 +118,6 @@ if not st.session_state['authenticated']:
         submit_btn = st.form_submit_button("Access Portal", type="primary")
         
         if submit_btn:
-            # Change "slsangul2026" to any secure password you prefer
             if admin_pass == "slsangul2026":
                 st.session_state['authenticated'] = True
                 st.success("✅ Authentication successful! Unlocking portal...")
@@ -126,7 +125,7 @@ if not st.session_state['authenticated']:
             else:
                 st.error("❌ Incorrect administrator password. Access denied.")
     
-    st.stop() # Halts script execution until login passes
+    st.stop()
 
 # --- 5. THE AI SOLVER ENGINE ---
 def solve_timetable(df_teachers, df_classes, df_curriculum, num_days=5, num_periods=8):
@@ -228,6 +227,16 @@ def solve_timetable(df_teachers, df_classes, df_curriculum, num_days=5, num_peri
             
         return True, class_results, teacher_results
     return False, None, None
+
+# Helper for Excel export conversion
+@st.cache_data
+def convert_df_to_excel(df):
+    from io import BytesIO
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Timetable')
+    processed_data = output.getvalue()
+    return processed_data
 
 # --- 6. STREAMLIT UI ---
 try:
@@ -363,24 +372,80 @@ elif page == "4. Generate Timetable":
             if success:
                 st.success("✅ Timetable Generated Successfully!")
                 
-                tab_classes, tab_teachers = st.tabs(["📚 Class Timetables", "👨‍🏫 Teacher Timetables"])
+                tab_classes, tab_teachers, tab_analytics = st.tabs(["📚 Class Timetables", "👨‍🏫 Teacher Timetables", "📊 Workload & Free Periods"])
                 
                 with tab_classes:
                     if class_schedules:
-                        class_tabs = st.tabs(list(class_schedules.keys()))
+                        class_names = list(class_schedules.keys())
+                        class_tabs = st.tabs(class_names)
                         for idx, t in enumerate(class_tabs):
                             with t:
-                                st.dataframe(class_schedules[list(class_schedules.keys())[idx]], hide_index=True)
+                                c_name = class_names[idx]
+                                df_sched = class_schedules[c_name]
+                                st.dataframe(df_sched, hide_index=True, use_container_width=True)
+                                
+                                # Excel Export
+                                excel_data = convert_df_to_excel(df_sched)
+                                st.download_button(
+                                    label=f"📥 Download {c_name} Schedule as Excel",
+                                    data=excel_data,
+                                    file_name=f"{c_name}_Timetable.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                )
                     else:
                         st.info("No class schedules generated.")
                             
                 with tab_teachers:
                     if teacher_schedules:
-                        teacher_tabs = st.tabs(list(teacher_schedules.keys()))
+                        teacher_names = list(teacher_schedules.keys())
+                        teacher_tabs = st.tabs(teacher_names)
                         for idx, t in enumerate(teacher_tabs):
                             with t:
-                                st.dataframe(teacher_schedules[list(teacher_schedules.keys())[idx]], hide_index=True)
+                                t_name = teacher_names[idx]
+                                df_t_sched = teacher_schedules[t_name]
+                                st.dataframe(df_t_sched, hide_index=True, use_container_width=True)
+                                
+                                # Excel Export
+                                excel_data = convert_df_to_excel(df_t_sched)
+                                st.download_button(
+                                    label=f"📥 Download {t_name} Schedule as Excel",
+                                    data=excel_data,
+                                    file_name=f"{t_name}_Timetable.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                )
                     else:
                         st.info("No teacher schedules generated.")
+
+                with tab_analytics:
+                    st.subheader("📊 Teacher Workload & Gap Analysis")
+                    st.info("Review total assigned teaching periods per week against their maximum limit to spot gaps or overloads.")
+                    
+                    summary_data = []
+                    total_slots = 5 * 8 # 5 days * 8 periods = 40 max possible slots
+                    
+                    for _, teacher in df_t.iterrows():
+                        t_name = teacher['name']
+                        max_wk = teacher['max_weekly']
+                        
+                        # Count assigned slots for this teacher
+                        assigned_count = 0
+                        if t_name in teacher_schedules:
+                            df_ts = teacher_schedules[t_name]
+                            for col in df_ts.columns:
+                                if col != "Day":
+                                    assigned_count += (df_ts[col] != "---").sum()
+                                    
+                        free_periods = total_slots - assigned_count
+                        summary_data.append({
+                            "Teacher Name": t_name,
+                            "Assigned Periods/Week": assigned_count,
+                            "Max Weekly Limit": max_wk,
+                            "Free/Rest Periods": free_periods,
+                            "Status": "⚠️ Overloaded" if assigned_count > max_wk else "✅ Balanced"
+                        })
+                        
+                    df_summary = pd.DataFrame(summary_data)
+                    st.dataframe(df_summary, hide_index=True, use_container_width=True)
+                    
             else:
                 st.error("❌ Failed. You need more teachers or fewer required periods.")
